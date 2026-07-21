@@ -1,3 +1,5 @@
+import "dotenv/config";
+
 import { createPrismaClient } from "@/server/db";
 
 import { seedServiceCatalog } from "./catalog";
