@@ -1,0 +1,1099 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum HouseholdRole {
+  owner
+  admin
+  member
+}
+
+enum SexAssignedAtBirth {
+  female
+  male
+  intersex
+  unknown
+  prefer_not_to_answer
+}
+
+enum CarePlanMode {
+  evidence_based
+  extra_attentive
+  clinician_plan
+}
+
+enum ProfileVisibility {
+  owner_only
+  selected_members
+  household
+}
+
+enum ProfilePermission {
+  view
+  edit
+  manage
+}
+
+enum AnatomyKey {
+  cervix
+  breast_tissue
+  prostate
+  uterus
+  ovaries
+}
+
+enum AnatomyState {
+  present
+  absent
+  unknown
+  prefer_not_to_answer
+}
+
+enum HealthContextSource {
+  user
+  clinician
+  medical_record
+  csv_import
+}
+
+enum ConditionStatus {
+  active
+  resolved
+  history
+}
+
+enum MedicationStatus {
+  active
+  paused
+  ended
+}
+
+enum ServiceCategory {
+  cancer_screening
+  cardiometabolic
+  infectious_disease
+  immunization
+  bone_joint
+  vascular
+  mental_behavioral
+  sensory_function
+  routine_maintenance
+  medication_monitoring
+  custom
+}
+
+enum DatePrecision {
+  day
+  month
+  year
+  unknown
+}
+
+enum GuidelineReviewStatus {
+  draft
+  reviewed
+  active
+  retired
+}
+
+enum RecommendationStatus {
+  future
+  up_to_date
+  due_this_year
+  due_soon
+  due_now
+  overdue
+  unknown_history
+  needs_date_confirmation
+  discuss_with_clinician
+  clinician_managed
+  not_routinely_recommended
+  not_applicable
+  completed_once
+}
+
+enum RecommendationClass {
+  routine
+  shared_decision       @map("shared-decision")
+  selective
+  insufficient_evidence @map("insufficient-evidence")
+  not_recommended       @map("not-recommended")
+  custom_maintenance    @map("custom-maintenance")
+}
+
+enum CareEventResult {
+  normal
+  abnormal
+  inconclusive
+  unknown
+  not_applicable
+}
+
+enum CareEventSource {
+  user_memory
+  medical_record
+  clinician
+  pharmacy
+  csv_import
+}
+
+enum ClinicianOverrideType {
+  exact_next_date
+  recurring_interval
+  no_longer_needed
+  clinician_managed
+}
+
+enum CustomMaintenanceKind {
+  routine
+  lab_bundle
+}
+
+enum CustomMaintenanceSource {
+  personal
+  clinician
+  app_template
+}
+
+enum CustomMaintenanceStatus {
+  active
+  ask_clinician
+  disabled
+}
+
+enum CustomMaintenanceVisibility {
+  profile_access
+  owner_only
+}
+
+enum CustomMaintenanceCadenceUnit {
+  days
+  weeks
+  months
+  years
+}
+
+enum PlannedActionStatus {
+  planned
+  scheduled
+  completed
+  cancelled
+}
+
+enum ReminderChannel {
+  in_app
+  email
+}
+
+enum ReminderStatus {
+  pending
+  sent
+  dismissed
+  cancelled
+}
+
+enum ReminderDigestMode {
+  individual
+  daily
+  weekly
+}
+
+enum ImportBatchStatus {
+  previewing
+  ready
+  committing
+  committed
+  failed
+}
+
+enum HistoryAssertionState {
+  no_record
+  never_completed
+  completed_exact
+  completed_month
+  completed_year
+  completed_date_unknown
+  unsure
+  declined
+  not_applicable_claim
+}
+
+model User {
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique @db.VarChar(254)
+  emailNormalized String    @unique @db.VarChar(254)
+  passwordHash    String?   @db.VarChar(255)
+  name            String?   @db.VarChar(100)
+  emailVerified   DateTime? @map("email_verified_at") @db.Timestamptz(3)
+  image           String?   @db.VarChar(2048)
+  lastLoginAt     DateTime? @db.Timestamptz(3)
+  sessionVersion  Int       @default(1)
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt       DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt       DateTime? @db.Timestamptz(3)
+
+  accounts                   Account[]
+  authenticators             Authenticator[]
+  sessions                   Session[]
+  ownedHouseholds            Household[]                  @relation("HouseholdOwner")
+  householdMemberships       HouseholdMember[]
+  householdInvitesCreated    HouseholdInvite[]            @relation("HouseholdInviteCreator")
+  ownedProfiles              Profile[]                    @relation("ProfileOwner")
+  profilesCreated            Profile[]                    @relation("ProfileCreator")
+  profileAccessGrants        ProfileAccessGrant[]         @relation("ProfileAccessUser")
+  profileAccessGrantsCreated ProfileAccessGrant[]         @relation("ProfileAccessGrantor")
+  profileClaimInvitesCreated ProfileClaimInvite[]         @relation("ProfileClaimInviteCreator")
+  guidelineSelections        ProfileGuidelineSelection[]
+  careEventsCreated          CareEvent[]
+  clinicianOverridesCreated  ClinicianOverride[]
+  customMaintenanceCreated   CustomMaintenance[]
+  plannedActionsCreated      PlannedAction[]
+  documentsUploaded          Document[]
+  auditLogs                  AuditLog[]
+  importBatchesUploaded      ImportBatch[]
+  onboardingDraft            OnboardingDraft?
+  historyStatesRecorded      ProfileServiceHistoryState[]
+  reminderPreferences        ReminderPreference[]
+  visitPrepPreferences       VisitPrepPreference[]
+
+  @@index([deletedAt])
+}
+
+model Account {
+  id                String  @id @default(uuid()) @db.Uuid
+  userId            String  @db.Uuid
+  type              String  @db.VarChar(50)
+  provider          String  @db.VarChar(100)
+  providerAccountId String  @db.VarChar(255)
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String? @db.VarChar(100)
+  scope             String? @db.Text
+  id_token          String? @db.Text
+  session_state     String? @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(uuid()) @db.Uuid
+  sessionToken String   @unique @db.VarChar(255)
+  userId       String   @db.Uuid
+  expires      DateTime @db.Timestamptz(3)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, expires])
+  @@index([expires])
+}
+
+model VerificationToken {
+  identifier String   @db.VarChar(254)
+  token      String   @unique @db.VarChar(255)
+  expires    DateTime @db.Timestamptz(3)
+
+  @@unique([identifier, token])
+}
+
+model Authenticator {
+  credentialID         String  @unique @db.Text
+  userId               String  @db.Uuid
+  providerAccountId    String  @db.VarChar(255)
+  credentialPublicKey  String  @db.Text
+  counter              Int
+  credentialDeviceType String  @db.VarChar(32)
+  credentialBackedUp   Boolean
+  transports           String? @db.Text
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, credentialID])
+}
+
+model Household {
+  id          String    @id @default(uuid()) @db.Uuid
+  name        String    @db.VarChar(100)
+  ownerUserId String    @db.Uuid
+  timezone    String    @db.VarChar(80)
+  countryCode String    @default("US") @db.Char(2)
+  createdAt   DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt   DateTime? @db.Timestamptz(3)
+
+  owner     User              @relation("HouseholdOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  members   HouseholdMember[]
+  invites   HouseholdInvite[]
+  profiles  Profile[]
+  documents Document[]
+  auditLogs AuditLog[]
+
+  @@index([ownerUserId, deletedAt])
+}
+
+model HouseholdMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  householdId String        @db.Uuid
+  userId      String        @db.Uuid
+  role        HouseholdRole
+  joinedAt    DateTime      @default(now()) @db.Timestamptz(3)
+  removedAt   DateTime?     @db.Timestamptz(3)
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([householdId, removedAt])
+  @@index([userId, removedAt])
+}
+
+model HouseholdInvite {
+  id              String        @id @default(uuid()) @db.Uuid
+  householdId     String        @db.Uuid
+  emailNormalized String        @db.VarChar(254)
+  role            HouseholdRole
+  tokenHash       String        @unique @db.Char(64)
+  expiresAt       DateTime      @db.Timestamptz(3)
+  acceptedAt      DateTime?     @db.Timestamptz(3)
+  revokedAt       DateTime?     @db.Timestamptz(3)
+  invitedByUserId String        @db.Uuid
+  createdAt       DateTime      @default(now()) @db.Timestamptz(3)
+
+  household Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  invitedBy User      @relation("HouseholdInviteCreator", fields: [invitedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([householdId, emailNormalized])
+  @@index([emailNormalized, expiresAt])
+}
+
+model Profile {
+  id                 String             @id @default(uuid()) @db.Uuid
+  householdId        String             @db.Uuid
+  ownerUserId        String?            @db.Uuid
+  createdByUserId    String             @db.Uuid
+  displayName        String             @db.VarChar(80)
+  relationshipLabel  String             @db.VarChar(50)
+  dateOfBirth        DateTime           @db.Date
+  sexAssignedAtBirth SexAssignedAtBirth
+  genderIdentity     String?            @db.VarChar(120)
+  countryCode        String             @default("US") @db.Char(2)
+  timezone           String             @db.VarChar(80)
+  carePlanMode       CarePlanMode       @default(evidence_based)
+  visibility         ProfileVisibility  @default(owner_only)
+  claimedAt          DateTime?          @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @db.Timestamptz(3)
+  deletedAt          DateTime?          @db.Timestamptz(3)
+
+  household            Household                    @relation(fields: [householdId], references: [id], onDelete: Restrict)
+  owner                User?                        @relation("ProfileOwner", fields: [ownerUserId], references: [id], onDelete: SetNull)
+  createdBy            User                         @relation("ProfileCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  accessGrants         ProfileAccessGrant[]
+  claimInvites         ProfileClaimInvite[]
+  anatomy              ProfileAnatomy[]
+  riskFactors          RiskFactor[]
+  conditions           Condition[]
+  familyHistory        FamilyHistory[]
+  surgeries            Surgery[]
+  medications          Medication[]
+  guidelineSelections  ProfileGuidelineSelection[]
+  careEvents           CareEvent[]
+  clinicianOverrides   ClinicianOverride[]
+  customMaintenance    CustomMaintenance[]
+  recommendations      RecommendationInstance[]
+  plannedActions       PlannedAction[]
+  reminders            Reminder[]
+  documents            Document[]
+  auditLogs            AuditLog[]
+  importBatches        ImportBatch[]
+  serviceHistoryStates ProfileServiceHistoryState[]
+  reminderPreferences  ReminderPreference[]
+  visitPrepPreferences VisitPrepPreference[]
+
+  @@index([householdId, deletedAt])
+  @@index([ownerUserId, deletedAt])
+}
+
+model ProfileAccessGrant {
+  id              String            @id @default(uuid()) @db.Uuid
+  profileId       String            @db.Uuid
+  userId          String            @db.Uuid
+  permission      ProfilePermission
+  grantedByUserId String            @db.Uuid
+  createdAt       DateTime          @default(now()) @db.Timestamptz(3)
+
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  user      User    @relation("ProfileAccessUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User    @relation("ProfileAccessGrantor", fields: [grantedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, userId])
+  @@index([userId, permission])
+}
+
+model ProfileClaimInvite {
+  id              String    @id @default(uuid()) @db.Uuid
+  profileId       String    @db.Uuid
+  emailNormalized String    @db.VarChar(254)
+  tokenHash       String    @unique @db.Char(64)
+  expiresAt       DateTime  @db.Timestamptz(3)
+  acceptedAt      DateTime? @db.Timestamptz(3)
+  revokedAt       DateTime? @db.Timestamptz(3)
+  createdByUserId String    @db.Uuid
+  createdAt       DateTime  @default(now()) @db.Timestamptz(3)
+
+  profile   Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  createdBy User    @relation("ProfileClaimInviteCreator", fields: [createdByUserId], references: [id], onDelete: Restrict)
+
+  @@index([profileId, expiresAt])
+  @@index([emailNormalized, expiresAt])
+}
+
+model ProfileAnatomy {
+  id            String       @id @default(uuid()) @db.Uuid
+  profileId     String       @db.Uuid
+  anatomyKey    AnatomyKey
+  state         AnatomyState
+  effectiveDate DateTime?    @db.Date
+  note          String?      @db.VarChar(500)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, anatomyKey])
+}
+
+model RiskFactor {
+  id        String              @id @default(uuid()) @db.Uuid
+  profileId String              @db.Uuid
+  type      String              @db.VarChar(80)
+  valueJson Json                @db.JsonB
+  startedAt DateTime?           @db.Date
+  endedAt   DateTime?           @db.Date
+  source    HealthContextSource
+  createdAt DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime            @updatedAt @db.Timestamptz(3)
+  deletedAt DateTime?           @db.Timestamptz(3)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@index([profileId, type, deletedAt])
+}
+
+model Condition {
+  id                     String          @id @default(uuid()) @db.Uuid
+  profileId              String          @db.Uuid
+  code                   String          @db.VarChar(80)
+  displayName            String          @db.VarChar(160)
+  status                 ConditionStatus
+  diagnosedStart         DateTime?       @db.Date
+  diagnosedEnd           DateTime?       @db.Date
+  diagnosedDatePrecision DatePrecision   @default(unknown)
+  note                   String?         @db.VarChar(2000)
+  createdAt              DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime        @updatedAt @db.Timestamptz(3)
+  deletedAt              DateTime?       @db.Timestamptz(3)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@index([profileId, code, status, deletedAt])
+}
+
+model FamilyHistory {
+  id               String    @id @default(uuid()) @db.Uuid
+  profileId        String    @db.Uuid
+  relationship     String    @db.VarChar(80)
+  conditionCode    String    @db.VarChar(80)
+  conditionDisplay String    @db.VarChar(160)
+  ageAtDiagnosis   Int?
+  note             String?   @db.VarChar(2000)
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime  @updatedAt @db.Timestamptz(3)
+  deletedAt        DateTime? @db.Timestamptz(3)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@index([profileId, conditionCode, deletedAt])
+}
+
+model Surgery {
+  id                     String        @id @default(uuid()) @db.Uuid
+  profileId              String        @db.Uuid
+  code                   String        @db.VarChar(80)
+  displayName            String        @db.VarChar(160)
+  performedStart         DateTime?     @db.Date
+  performedEnd           DateTime?     @db.Date
+  performedDatePrecision DatePrecision @default(unknown)
+  anatomyEffectsJson     Json?         @db.JsonB
+  note                   String?       @db.VarChar(2000)
+  createdAt              DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime      @updatedAt @db.Timestamptz(3)
+  deletedAt              DateTime?     @db.Timestamptz(3)
+
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+
+  @@index([profileId, code, deletedAt])
+}
+
+model Medication {
+  id                     String           @id @default(uuid()) @db.Uuid
+  profileId              String           @db.Uuid
+  name                   String           @db.VarChar(160)
+  dose                   String?          @db.VarChar(120)
+  frequency              String?          @db.VarChar(120)
+  prescriber             String?          @db.VarChar(160)
+  reason                 String?          @db.VarChar(500)
+  startedStart           DateTime?        @db.Date
+  startedEnd             DateTime?        @db.Date
+  startedDatePrecision   DatePrecision    @default(unknown)
+  endedStart             DateTime?        @db.Date
+  endedEnd               DateTime?        @db.Date
+  endedDatePrecision     DatePrecision?
+  status                 MedicationStatus @default(active)
+  monitoringInstructions String?          @db.VarChar(2000)
+  nextReviewDate         DateTime?        @db.Date
+  notes                  String?          @db.VarChar(2000)
+  classCodesJson         Json             @default("[]") @db.JsonB
+  createdAt              DateTime         @default(now()) @db.Timestamptz(3)
+  updatedAt              DateTime         @updatedAt @db.Timestamptz(3)
+  deletedAt              DateTime?        @db.Timestamptz(3)
+
+  profile       Profile        @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  documentLinks DocumentLink[]
+
+  @@index([profileId, status, deletedAt])
+  @@index([profileId, nextReviewDate])
+}
+
+model ServiceCatalog {
+  id          String          @id @default(uuid()) @db.Uuid
+  slug        String          @unique @db.VarChar(120)
+  name        String          @db.VarChar(160)
+  shortName   String          @db.VarChar(100)
+  category    ServiceCategory
+  description String          @db.Text
+  bodySystem  String?         @db.VarChar(100)
+  eventType   String          @db.VarChar(80)
+  active      Boolean         @default(true)
+  sortOrder   Int             @default(0)
+  createdAt   DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime        @updatedAt @db.Timestamptz(3)
+
+  methods              ServiceMethod[]
+  guidelineRules       GuidelineRule[]
+  careEvents           CareEvent[]
+  clinicianOverrides   ClinicianOverride[]
+  maintenanceTemplates CustomMaintenance[]          @relation("MaintenanceTemplateService")
+  recommendations      RecommendationInstance[]
+  plannedActions       PlannedAction[]
+  profileHistoryStates ProfileServiceHistoryState[]
+
+  @@index([category, active, sortOrder])
+}
+
+model ServiceMethod {
+  id           String  @id @default(uuid()) @db.Uuid
+  serviceId    String  @db.Uuid
+  slug         String  @db.VarChar(120)
+  name         String  @db.VarChar(160)
+  description  String  @db.Text
+  active       Boolean @default(true)
+  metadataJson Json?   @db.JsonB
+
+  service            ServiceCatalog      @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  careEvents         CareEvent[]
+  clinicianOverrides ClinicianOverride[]
+
+  @@unique([serviceId, slug])
+  @@index([serviceId, active])
+}
+
+model GuidelineSource {
+  id                String    @id @default(uuid()) @db.Uuid
+  slug              String    @unique @db.VarChar(120)
+  organization      String    @db.VarChar(160)
+  title             String    @db.VarChar(300)
+  canonicalUrl      String    @db.VarChar(2048)
+  sourceType        String    @db.VarChar(80)
+  jurisdiction      String    @default("US") @db.VarChar(20)
+  publishedAt       DateTime? @db.Date
+  effectiveAt       DateTime? @db.Date
+  lastVerifiedAt    DateTime  @db.Date
+  contentHash       String?   @db.Char(64)
+  attributionText   String?   @db.Text
+  licenseOrTermsUrl String?   @db.VarChar(2048)
+  active            Boolean   @default(true)
+  createdAt         DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt         DateTime  @updatedAt @db.Timestamptz(3)
+
+  rules        GuidelineRule[]
+  syncLogs     SourceSyncLog[]
+  cacheEntries ExternalContentCache[]
+
+  @@index([active, lastVerifiedAt])
+  @@index([sourceType, jurisdiction])
+}
+
+/// Active, open-ended baseline rows may be segmented by population or schedule.
+/// A PostgreSQL exclusion constraint allows those rows to share one variant per conflict group.
+model GuidelineRule {
+  id                        String                @id @default(uuid()) @db.Uuid
+  stableKey                 String                @db.VarChar(160)
+  version                   Int
+  serviceId                 String                @db.Uuid
+  variantId                 String                @db.VarChar(100)
+  conflictGroup             String?               @db.VarChar(100)
+  isBaseline                Boolean               @default(false)
+  sourceId                  String                @db.Uuid
+  jurisdiction              String                @default("US") @db.VarChar(20)
+  evidenceGrade             String?               @db.VarChar(40)
+  recommendationClass       RecommendationClass
+  appliesWhenJson           Json                  @db.JsonB
+  excludesWhenJson          Json?                 @db.JsonB
+  stopWhenJson              Json?                 @db.JsonB
+  scheduleJson              Json                  @db.JsonB
+  completionEventTypesJson  Json                  @db.JsonB
+  allowedMethodsJson        Json?                 @db.JsonB
+  outcomeModifiersJson      Json?                 @db.JsonB
+  consumerSummary           String                @db.Text
+  whyItMatters              String                @db.Text
+  questionsForClinicianJson Json                  @db.JsonB
+  limitationsJson           Json                  @db.JsonB
+  effectiveFrom             DateTime              @db.Date
+  effectiveTo               DateTime?             @db.Date
+  reviewStatus              GuidelineReviewStatus
+  reviewedBy                String                @db.VarChar(160)
+  reviewedAt                DateTime              @db.Date
+  createdAt                 DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt                 DateTime              @updatedAt @db.Timestamptz(3)
+
+  service         ServiceCatalog           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  source          GuidelineSource          @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+  recommendations RecommendationInstance[]
+
+  @@unique([stableKey, version])
+  @@index([serviceId, reviewStatus, effectiveFrom, effectiveTo])
+  @@index([sourceId, reviewStatus])
+  @@index([conflictGroup, reviewStatus])
+}
+
+model ProfileGuidelineSelection {
+  id               String   @id @default(uuid()) @db.Uuid
+  profileId        String   @db.Uuid
+  conflictGroup    String   @db.VarChar(100)
+  variantId        String   @db.VarChar(100)
+  selectedByUserId String   @db.Uuid
+  selectedAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  profile    Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  selectedBy User    @relation(fields: [selectedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, conflictGroup])
+}
+
+model CareEvent {
+  id                   String          @id @default(uuid()) @db.Uuid
+  profileId            String          @db.Uuid
+  serviceId            String          @db.Uuid
+  methodId             String?         @db.Uuid
+  performedStart       DateTime?       @db.Date
+  performedEnd         DateTime?       @db.Date
+  datePrecision        DatePrecision
+  result               CareEventResult
+  providerName         String?         @db.VarChar(120)
+  locationName         String?         @db.VarChar(160)
+  notes                String?         @db.VarChar(2000)
+  source               CareEventSource
+  importBatchId        String?         @db.Uuid
+  duplicateFingerprint String          @db.Char(64)
+  createdByUserId      String          @db.Uuid
+  createdAt            DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt            DateTime        @updatedAt @db.Timestamptz(3)
+  deletedAt            DateTime?       @db.Timestamptz(3)
+
+  profile         Profile                  @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  service         ServiceCatalog           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  method          ServiceMethod?           @relation(fields: [methodId], references: [id], onDelete: SetNull)
+  importBatch     ImportBatch?             @relation(fields: [importBatchId], references: [id], onDelete: SetNull)
+  createdBy       User                     @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  recommendations RecommendationInstance[] @relation("LastQualifyingEvent")
+  documentLinks   DocumentLink[]
+
+  @@index([profileId, serviceId, performedStart(sort: Desc), deletedAt])
+  @@index([profileId, duplicateFingerprint, deletedAt])
+  @@index([importBatchId])
+}
+
+model ClinicianOverride {
+  id                       String                @id @default(uuid()) @db.Uuid
+  profileId                String                @db.Uuid
+  serviceId                String                @db.Uuid
+  methodId                 String?               @db.Uuid
+  overrideType             ClinicianOverrideType
+  nextDueStart             DateTime?             @db.Date
+  nextDueEnd               DateTime?             @db.Date
+  intervalJson             Json?                 @db.JsonB
+  replacesGeneralGuideline Boolean               @default(true)
+  clinicianName            String?               @db.VarChar(160)
+  practiceName             String?               @db.VarChar(160)
+  instructionReceivedDate  DateTime              @db.Date
+  reason                   String?               @db.VarChar(1000)
+  reviewDate               DateTime?             @db.Date
+  active                   Boolean               @default(true)
+  pausedAt                 DateTime?             @db.Timestamptz(3)
+  createdByUserId          String                @db.Uuid
+  createdAt                DateTime              @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime              @updatedAt @db.Timestamptz(3)
+
+  profile         Profile                  @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  service         ServiceCatalog           @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  method          ServiceMethod?           @relation(fields: [methodId], references: [id], onDelete: SetNull)
+  createdBy       User                     @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  recommendations RecommendationInstance[] @relation("ActiveOverride")
+  documentLinks   DocumentLink[]
+
+  @@index([profileId, serviceId, active, pausedAt])
+  @@index([reviewDate, active, pausedAt])
+}
+
+model CustomMaintenance {
+  id                 String                        @id @default(uuid()) @db.Uuid
+  profileId          String                        @db.Uuid
+  templateServiceId  String?                       @db.Uuid
+  title              String                        @db.VarChar(160)
+  category           String                        @db.VarChar(100)
+  purpose            String?                       @db.VarChar(1000)
+  kind               CustomMaintenanceKind         @default(routine)
+  source             CustomMaintenanceSource
+  clinicianName      String?                       @db.VarChar(160)
+  practiceName       String?                       @db.VarChar(160)
+  cadenceValue       Int?
+  cadenceUnit        CustomMaintenanceCadenceUnit?
+  startDate          DateTime?                     @db.Date
+  stopDate           DateTime?                     @db.Date
+  nextDate           DateTime?                     @db.Date
+  reminderEnabled    Boolean                       @default(false)
+  reminderDaysBefore Int?
+  visibility         CustomMaintenanceVisibility   @default(profile_access)
+  notes              String?                       @db.VarChar(2000)
+  status             CustomMaintenanceStatus       @default(active)
+  disabledAt         DateTime?                     @db.Timestamptz(3)
+  createdByUserId    String                        @db.Uuid
+  createdAt          DateTime                      @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                      @updatedAt @db.Timestamptz(3)
+
+  profile         Profile                     @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  templateService ServiceCatalog?             @relation("MaintenanceTemplateService", fields: [templateServiceId], references: [id], onDelete: Restrict)
+  createdBy       User                        @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  labEntries      CustomMaintenanceLabEntry[]
+
+  @@unique([profileId, templateServiceId])
+  @@index([profileId, status, nextDate])
+  @@index([profileId, visibility])
+}
+
+model CustomMaintenanceLabEntry {
+  id                  String   @id @default(uuid()) @db.Uuid
+  customMaintenanceId String   @db.Uuid
+  name                String   @db.VarChar(160)
+  note                String?  @db.VarChar(500)
+  sortOrder           Int      @default(0)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+
+  customMaintenance CustomMaintenance @relation(fields: [customMaintenanceId], references: [id], onDelete: Cascade)
+
+  @@index([customMaintenanceId, sortOrder])
+}
+
+model RecommendationInstance {
+  id                    String               @id @default(uuid()) @db.Uuid
+  profileId             String               @db.Uuid
+  serviceId             String               @db.Uuid
+  ruleId                String               @db.Uuid
+  ruleVersion           Int
+  variantId             String               @db.VarChar(100)
+  conflictGroup         String?              @db.VarChar(100)
+  status                RecommendationStatus
+  recommendationClass   RecommendationClass
+  dueStart              DateTime?            @db.Date
+  dueEnd                DateTime?            @db.Date
+  lastQualifyingEventId String?              @db.Uuid
+  activeOverrideId      String?              @db.Uuid
+  /// Structured calculation object with explanation tokens, ranges, limitations, and trace.
+  explanationJson       Json                 @db.JsonB
+  /// Array of the profile facts that matched this recommendation.
+  matchingFactsJson     Json                 @db.JsonB
+  calculationHash       String               @db.VarChar(64)
+  evaluatedAsOf         DateTime             @db.Date
+  retiredAt             DateTime?            @db.Timestamptz(3)
+  createdAt             DateTime             @default(now()) @db.Timestamptz(3)
+  updatedAt             DateTime             @updatedAt @db.Timestamptz(3)
+
+  profile             Profile            @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  service             ServiceCatalog     @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  rule                GuidelineRule      @relation(fields: [ruleId], references: [id], onDelete: Restrict)
+  lastQualifyingEvent CareEvent?         @relation("LastQualifyingEvent", fields: [lastQualifyingEventId], references: [id], onDelete: SetNull)
+  activeOverride      ClinicianOverride? @relation("ActiveOverride", fields: [activeOverrideId], references: [id], onDelete: SetNull)
+  plannedActions      PlannedAction[]
+  reminders           Reminder[]
+
+  @@index([profileId, status, dueStart, retiredAt])
+  @@index([profileId, ruleId, retiredAt])
+  @@index([calculationHash])
+}
+
+model PlannedAction {
+  id                       String              @id @default(uuid()) @db.Uuid
+  profileId                String              @db.Uuid
+  recommendationInstanceId String?             @db.Uuid
+  serviceId                String              @db.Uuid
+  title                    String              @db.VarChar(200)
+  plannedMonth             DateTime?           @db.Date
+  appointmentStart         DateTime?           @db.Timestamptz(3)
+  appointmentEnd           DateTime?           @db.Timestamptz(3)
+  timezone                 String              @db.VarChar(80)
+  location                 String?             @db.VarChar(200)
+  notes                    String?             @db.VarChar(2000)
+  status                   PlannedActionStatus @default(planned)
+  createdByUserId          String              @db.Uuid
+  createdAt                DateTime            @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime            @updatedAt @db.Timestamptz(3)
+
+  profile        Profile                 @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  recommendation RecommendationInstance? @relation(fields: [recommendationInstanceId], references: [id], onDelete: SetNull)
+  service        ServiceCatalog          @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  createdBy      User                    @relation(fields: [createdByUserId], references: [id], onDelete: Restrict)
+  reminders      Reminder[]
+
+  @@index([profileId, status, plannedMonth])
+  @@index([profileId, appointmentStart])
+}
+
+model Reminder {
+  id                       String          @id @default(uuid()) @db.Uuid
+  profileId                String          @db.Uuid
+  plannedActionId          String?         @db.Uuid
+  recommendationInstanceId String?         @db.Uuid
+  channel                  ReminderChannel
+  remindAt                 DateTime        @db.Timestamptz(3)
+  status                   ReminderStatus  @default(pending)
+  dedupeKey                String          @db.VarChar(160)
+  sentAt                   DateTime?       @db.Timestamptz(3)
+  snoozedUntil             DateTime?       @db.Timestamptz(3)
+  snoozedFrom              DateTime?       @db.Timestamptz(3)
+  createdAt                DateTime        @default(now()) @db.Timestamptz(3)
+  updatedAt                DateTime        @updatedAt @db.Timestamptz(3)
+
+  profile        Profile                 @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  plannedAction  PlannedAction?          @relation(fields: [plannedActionId], references: [id], onDelete: Cascade)
+  recommendation RecommendationInstance? @relation(fields: [recommendationInstanceId], references: [id], onDelete: Cascade)
+
+  @@unique([profileId, channel, dedupeKey])
+  @@index([status, remindAt])
+  @@index([profileId, status, remindAt])
+  @@index([profileId, snoozedUntil])
+}
+
+model ReminderPreference {
+  id                      String             @id @default(uuid()) @db.Uuid
+  userId                  String             @db.Uuid
+  profileId               String             @db.Uuid
+  inAppEnabled            Boolean            @default(true)
+  emailEnabled            Boolean            @default(false)
+  unknownHistoryPrompts   Boolean            @default(true)
+  quietDaysJson           Json               @default("[]") @db.JsonB
+  quietHoursStart         String?            @db.VarChar(5)
+  quietHoursEnd           String?            @db.VarChar(5)
+  dueSoonWindowDays       Int                @default(90)
+  householdActivityDetail Boolean            @default(false)
+  timezone                String             @db.VarChar(80)
+  digestMode              ReminderDigestMode @default(individual)
+  lastDigestSentAt        DateTime?           @db.Timestamptz(3)
+  createdAt               DateTime           @default(now()) @db.Timestamptz(3)
+  updatedAt               DateTime           @updatedAt @db.Timestamptz(3)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@index([profileId, emailEnabled])
+}
+
+model VisitPrepPreference {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  profileId     String   @db.Uuid
+  mode          String   @default("concise") @db.VarChar(20)
+  sectionsJson  Json     @db.JsonB
+  questionsJson Json     @db.JsonB
+  personalNotes String?  @db.VarChar(4000)
+  createdAt     DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @db.Timestamptz(3)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  profile Profile @relation(fields: [profileId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, profileId])
+  @@index([profileId])
+}
+
+model Document {
+  id               String    @id @default(uuid()) @db.Uuid
+  householdId      String    @db.Uuid
+  profileId        String    @db.Uuid
+  storageKey       String    @unique @db.VarChar(500)
+  originalFilename String    @db.VarChar(255)
+  safeFilename     String    @db.VarChar(255)
+  mimeType         String    @db.VarChar(100)
+  sizeBytes        BigInt
+  sha256           String    @db.Char(64)
+  uploadedByUserId String    @db.Uuid
+  createdAt        DateTime  @default(now()) @db.Timestamptz(3)
+  deletedAt        DateTime? @db.Timestamptz(3)
+  blobDeletedAt    DateTime? @db.Timestamptz(3)
+
+  household  Household      @relation(fields: [householdId], references: [id], onDelete: Restrict)
+  profile    Profile        @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  uploadedBy User           @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  links      DocumentLink[]
+
+  @@index([profileId, createdAt(sort: Desc), deletedAt])
+  @@index([householdId, createdAt(sort: Desc)])
+  @@index([sha256])
+  @@index([deletedAt, blobDeletedAt])
+}
+
+model DocumentLink {
+  id                  String   @id @default(uuid()) @db.Uuid
+  documentId          String   @db.Uuid
+  careEventId         String?  @db.Uuid
+  medicationId        String?  @db.Uuid
+  clinicianOverrideId String?  @db.Uuid
+  label               String   @db.VarChar(120)
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
+
+  document          Document           @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  careEvent         CareEvent?         @relation(fields: [careEventId], references: [id], onDelete: SetNull)
+  medication        Medication?        @relation(fields: [medicationId], references: [id], onDelete: SetNull)
+  clinicianOverride ClinicianOverride? @relation(fields: [clinicianOverrideId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([careEventId])
+  @@index([medicationId])
+  @@index([clinicianOverrideId])
+}
+
+model AuditLog {
+  id              String   @id @default(uuid()) @db.Uuid
+  householdId     String?  @db.Uuid
+  profileId       String?  @db.Uuid
+  actorUserId     String?  @db.Uuid
+  action          String   @db.VarChar(100)
+  entityType      String   @db.VarChar(100)
+  entityId        String   @db.VarChar(100)
+  metadataJson    Json     @db.JsonB
+  ipHash          String?  @db.Char(64)
+  userAgentFamily String?  @db.VarChar(120)
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
+
+  household Household? @relation(fields: [householdId], references: [id], onDelete: SetNull)
+  profile   Profile?   @relation(fields: [profileId], references: [id], onDelete: SetNull)
+  actor     User?      @relation(fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([householdId, createdAt(sort: Desc)])
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([actorUserId, createdAt(sort: Desc)])
+}
+
+model SourceSyncLog {
+  id          String    @id @default(uuid()) @db.Uuid
+  sourceId    String    @db.Uuid
+  startedAt   DateTime  @db.Timestamptz(3)
+  finishedAt  DateTime? @db.Timestamptz(3)
+  status      String    @db.VarChar(40)
+  httpStatus  Int?
+  contentHash String?   @db.Char(64)
+  changed     Boolean   @default(false)
+  message     String?   @db.VarChar(1000)
+
+  source GuidelineSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@index([sourceId, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+}
+
+model ExternalContentCache {
+  id               String   @id @default(uuid()) @db.Uuid
+  sourceId         String   @db.Uuid
+  cacheKey         String   @db.VarChar(255)
+  payloadJson      Json     @db.JsonB
+  contentHash      String   @db.Char(64)
+  fetchedAt        DateTime @db.Timestamptz(3)
+  expiresAt        DateTime @db.Timestamptz(3)
+  lastSuccessfulAt DateTime @db.Timestamptz(3)
+
+  source GuidelineSource @relation(fields: [sourceId], references: [id], onDelete: Restrict)
+
+  @@unique([sourceId, cacheKey])
+  @@index([expiresAt])
+  @@index([sourceId, lastSuccessfulAt(sort: Desc)])
+}
+
+model ImportBatch {
+  id               String            @id @default(uuid()) @db.Uuid
+  profileId        String            @db.Uuid
+  uploadedByUserId String            @db.Uuid
+  filename         String            @db.VarChar(255)
+  status           ImportBatchStatus
+  rowCount         Int
+  validCount       Int
+  errorCount       Int
+  commitTokenHash  String?           @unique @db.Char(64)
+  createdAt        DateTime          @default(now()) @db.Timestamptz(3)
+  committedAt      DateTime?         @db.Timestamptz(3)
+
+  profile    Profile     @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  uploadedBy User        @relation(fields: [uploadedByUserId], references: [id], onDelete: Restrict)
+  careEvents CareEvent[]
+
+  @@index([profileId, createdAt(sort: Desc)])
+  @@index([uploadedByUserId, status])
+}
+
+model OnboardingDraft {
+  userId    String   @id @db.Uuid
+  step      Int
+  dataJson  Json     @db.JsonB
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([updatedAt])
+}
+
+model ProfileServiceHistoryState {
+  id               String                @id @default(uuid()) @db.Uuid
+  profileId        String                @db.Uuid
+  serviceId        String                @db.Uuid
+  state            HistoryAssertionState
+  reason           String?               @db.VarChar(500)
+  recordedAt       DateTime              @db.Timestamptz(3)
+  recordedByUserId String                @db.Uuid
+
+  profile    Profile        @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  service    ServiceCatalog @relation(fields: [serviceId], references: [id], onDelete: Restrict)
+  recordedBy User           @relation(fields: [recordedByUserId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, serviceId])
+  @@index([profileId, state])
+  @@index([recordedByUserId, recordedAt(sort: Desc)])
+}

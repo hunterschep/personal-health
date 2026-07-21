@@ -1,0 +1,10 @@
+.next
+coverage
+GOAL.md
+node_modules
+PLAN.md
+playwright-report
+pnpm-lock.yaml
+public/sw.js
+src/generated
+test-results

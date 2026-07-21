@@ -1,0 +1,39 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+
+# production and test output
+/build
+/coverage
+/playwright-report
+/test-results
+
+# local environment
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# private health documents and backups
+/uploads/*
+!/uploads/.gitkeep
+/backups/
+
+# Prisma and local databases
+/src/generated/prisma/
+*.db
+*.db-journal
+
+# logs and OS files
+*.log
+.DS_Store
+Thumbs.db
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts

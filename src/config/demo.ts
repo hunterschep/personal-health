@@ -1,0 +1,8 @@
+export const SYNTHETIC_DEMO_USER_ID = "10000000-0000-4000-8000-000000000001";
+export const SYNTHETIC_PRIVATE_USER_ID = "10000000-0000-4000-8000-000000000002";
+
+const SYNTHETIC_USER_IDS = new Set([SYNTHETIC_DEMO_USER_ID, SYNTHETIC_PRIVATE_USER_ID]);
+
+export function isSyntheticDemoUser(userId: string): boolean {
+  return SYNTHETIC_USER_IDS.has(userId);
+}
