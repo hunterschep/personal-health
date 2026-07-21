@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:18-bookworm
+        env:
+          POSTGRES_USER: carecadence
+          POSTGRES_PASSWORD: carecadence
+          POSTGRES_DB: carecadence_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready --username=carecadence --dbname=carecadence_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://carecadence:carecadence@127.0.0.1:5432/carecadence_test
+      TEST_DATABASE_URL: postgresql://carecadence:carecadence@127.0.0.1:5432/carecadence_test
+      AUTH_SECRET: ci-only-secret-with-more-than-thirty-two-characters
+      AUTH_TRUST_HOST: "true"
+      SESSION_COOKIE_SECURE: "false"
+      APP_BASE_URL: http://127.0.0.1:3000
+      UPLOAD_DIR: ${{ runner.temp }}/carecadence-uploads
+      SOURCE_SYNC_ENABLED: "false"
+      DEMO_SEED_ENABLED: "true"
+      DEMO_USER_EMAIL: demo@carecadence.local
+      DEMO_USER_PASSWORD: carecadence-ci-demo-password
+      SMTP_HOST: ""
+      SMTP_PORT: ""
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      SMTP_FROM: ""
+      CI: "true"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11.9.0
+          run_install: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies from lockfile
+        run: pnpm install --frozen-lockfile
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod
+
+      - name: Generate Prisma client
+        run: pnpm db:generate
+
+      - name: Apply migrations to an empty database
+        run: pnpm db:migrate:deploy
+
+      - name: Seed test fixtures
+        run: |
+          pnpm db:seed
+          pnpm db:seed
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check formatting
+        run: pnpm format
+
+      - name: Typecheck
+        run: pnpm typecheck
+
+      - name: Run unit and integration tests
+        run: pnpm test:coverage
+
+      - name: Verify source structure without network requests
+        run: pnpm sources:verify
+
+      - name: Validate active rule provenance and scenarios
+        run: pnpm rules:validate
+
+      - name: Verify database rules match the checked-in catalog
+        run: pnpm rules:diff --check
+
+      - name: Build production application
+        run: pnpm build
+        env:
+          NODE_ENV: production
+
+      - name: Prepare standalone runtime assets
+        run: |
+          cp -R public .next/standalone/public
+          mkdir -p .next/standalone/.next
+          cp -R .next/static .next/standalone/.next/static
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium webkit
+
+      - name: Start production application and run browser tests
+        run: pnpm test:e2e
+        env:
+          NODE_ENV: production
+
+      - name: Run WebKit authentication smoke
+        run: pnpm exec playwright test --project=webkit-smoke --retries=0
+        env:
+          NODE_ENV: production
+          PLAYWRIGHT_WEBKIT_SMOKE: "true"
+
+      - name: Archive failure reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: carecadence-test-reports
+          if-no-files-found: ignore
+          retention-days: 14
+          path: |
+            carecadence-ci.log
+            coverage/
+            playwright-report/
+            test-results/
